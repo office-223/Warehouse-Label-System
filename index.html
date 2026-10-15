@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse Label System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <style>
+    :root {
+      --teal-dark: #1b6d5f;
+      --teal-main: #228b78;
+      --teal-light: #2c9e8b;
+      --teal-hover: #35ad99;
+
+      /* Button hex colors */
+      --btn-teal: #31c4a2;
+      --btn-teal-hover: #28b292;
+      --btn-blue: #3b9ff3;
+      --btn-blue-hover: #2891ec;
+      --btn-amber: #fba01c;
+      --btn-amber-hover: #e58f13;
+      --btn-red: #f8536e;
+      --btn-red-hover: #e63e59;
+    }
+    
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; padding: 0 !important; margin: 0 !important; }
+      #labelContainer { display: flex !important; padding: 0 !important; }
+      .label-page {
+        width: 4in !important;
+        height: 6in !important;
+        page-break-after: always !important;
+        page-break-inside: avoid !important;
+        margin: 0 !important;
+        padding: 0.2in !important;
+        box-shadow: none !important;
+        border: none !important;
+        box-sizing: border-box !important;
+      }
+    }
+
+    .label-page {
+      width: 4in;
+      height: 6in;
+      box-sizing: border-box;
+    }
+
+    /* Custom Button Styling */
+    .btn-mint-teal {
+      background-color: var(--btn-teal);
+      color: #ffffff;
+      font-weight: 700;
+      border-radius: 8px;
+      padding: 10px 20px;
+      transition: all 0.2s ease;
+    }
+    .btn-mint-teal:hover:not(:disabled) {
+      background-color: var(--btn-teal-hover);
+    }
+
+    .btn-mint-blue {
+      background-color: var(--btn-blue);
+      color: #ffffff;
+      font-weight: 700;
+      border-radius: 8px;
+      padding: 10px 20px;
+      transition: all 0.2s ease;
+    }
+    .btn-mint-blue:hover:not(:disabled) {
+      background-color: var(--btn-blue-hover);
+    }
+
+    .btn-mint-amber {
+      background-color: var(--btn-amber);
+      color: #ffffff;
+      font-weight: 700;
+      border-radius: 8px;
+      padding: 10px 20px;
+      transition: all 0.2s ease;
+    }
+    .btn-mint-amber:hover {
+      background-color: var(--btn-amber-hover);
+    }
+
+    .btn-mint-red {
+      background-color: var(--btn-red);
+      color: #ffffff;
+      font-weight: 700;
+      border-radius: 8px;
+      padding: 10px 20px;
+      transition: all 0.2s ease;
+    }
+    .btn-mint-red:hover {
+      background-color: var(--btn-red-hover);
+    }
+
+    /* Mintsoft Hover Auto-Expand Sidebar */
+    .sidebar-mintsoft {
+      width: 60px;
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+      background-color: var(--teal-main);
+      overflow-x: hidden;
+      white-space: nowrap;
+    }
+
+    .sidebar-mintsoft:hover {
+      width: 250px;
+      box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .sidebar-mintsoft .menu-label {
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+      pointer-events: none;
+    }
+
+    .sidebar-mintsoft:hover .menu-label {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Highlighted Background for Sidebar Title Only */
+    .sidebar-title-bg {
+      background-color: #5bb3ca !important;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      color: rgba(255, 255, 255, 0.88);
+      transition: background-color 0.15s ease;
+      cursor: pointer;
+    }
+
+    .nav-item:hover {
+      background-color: var(--teal-hover);
+      color: #ffffff;
+    }
+
+    .nav-item.active {
+      background-color: var(--teal-dark);
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .status { display: none; padding: 12px 16px; border-radius: 12px; font-size: 13px; }
+    .status.show { display: block; }
+    .status.work { background: #eff6ff; color: #1e40af; }
+    .status.good { background: #ecfdf3; color: #067647; }
+    .status.bad { background: #fef3f2; color: #b42318; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex">
+
+  <!-- LOGIN SCREEN INTERFACE MODAL -->
+  <div id="loginScreen" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+      
+      <!-- Login Top Banner -->
+      <div class="bg-[#228b78] p-6 text-white text-center space-y-3">
+        <div class="w-16 h-16 bg-[#3ba893] rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+          <svg class="w-10 h-10 text-white" viewBox="0 0 64 64" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="24" width="28" height="8" rx="2" fill="white"/>
+            <rect x="10" y="32" width="24" height="20" rx="2" fill="white"/>
+            <rect x="18" y="38" width="8" height="3" rx="1" fill="#3ba893"/>
+            <path d="M36 22C36 20.8954 36.8954 20 38 20H50C51.1046 20 52 20.8954 52 22V50C52 51.1046 51.1046 52 50 52H38C36.8954 52 36 51.1046 36 50V22Z" fill="white"/>
+            <path d="M44 42V30M44 30L40 34M44 30L48 34" stroke="#3ba893" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold tracking-tight">Warehouse Label System</h2>
+        <p class="text-xs text-teal-100">Sign in to access thermal label suite</p>
+      </div>
+
+      <!-- Login Form -->
+      <form onsubmit="handleLogin(event)" class="p-6 space-y-4">
+        <div id="loginError" class="hidden p-3 bg-rose-50 text-rose-600 rounded-lg text-xs font-semibold text-center">
+          Invalid credentials. Please check your username and password.
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">User Name</label>
+          <div class="relative">
+            <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="loginUser" value="" placeholder="Enter User Name" required class="w-full text-xs pl-8 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#228b78] focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="password" id="loginPass" value="" placeholder="Enter Password" required class="w-full text-xs pl-8 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#228b78] focus:outline-none">
+            
+            <button type="button" onclick="togglePasswordVisibility('loginPass', 'toggleIcon')" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-sm focus:outline-none">
+              <i id="toggleIcon" class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-mint-teal w-full py-3 text-xs uppercase tracking-wider font-bold shadow-md hover:shadow-lg mt-2">
+          Sign In To System
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ADD / EDIT USER MODAL -->
+  <div id="addUserModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+      
+      <!-- Modal Header -->
+      <div class="bg-[#228b78] p-4 text-white flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-user-gear text-lg"></i>
+          <h3 id="modalTitle" class="font-bold text-sm">Add New User & Assign Access</h3>
+        </div>
+        <button onclick="closeAddUserModal()" class="text-white/80 hover:text-white text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form Body -->
+      <form onsubmit="saveUser(event)" class="p-5 space-y-4 overflow-y-auto flex-1">
+        <input type="hidden" id="editingUserKey" value="">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">User Name</label>
+            <input type="text" id="newUsername" placeholder="e.g. John_Doe" required class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#228b78] focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
+            <div class="relative">
+              <input type="password" id="newPassword" placeholder="Enter Password" required class="w-full text-xs p-2.5 pr-8 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#228b78] focus:outline-none">
+              <button type="button" onclick="togglePasswordVisibility('newPassword', 'newPassToggleIcon')" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs">
+                <i id="newPassToggleIcon" class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Permissions -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Assign Warehouse Tool Access</label>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2.5">
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" id="permBoxLabel" class="rounded text-[#228b78] focus:ring-[#228b78]">
+              <i class="fa-solid fa-tags text-[#228b78]"></i>
+              <label for="permBoxLabel" class="font-bold text-slate-700 cursor-pointer">Box Label Generator</label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" id="permPdfSplit" class="rounded text-[#228b78] focus:ring-[#228b78]">
+              <i class="fa-solid fa-scissors text-indigo-600"></i>
+              <label for="permPdfSplit" class="font-bold text-slate-700 cursor-pointer">PDF 4×6 Splitter</label>
+            </div>
+            <div class="flex items-center space-x-2 border-t pt-2.5 mt-2">
+              <input type="checkbox" id="permAdmin" class="rounded text-purple-600 focus:ring-purple-600">
+              <i class="fa-solid fa-user-shield text-purple-600"></i>
+              <label for="permAdmin" class="font-bold text-purple-800 cursor-pointer">Full Admin Access (User Management)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-2">
+          <button type="button" onclick="closeAddUserModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold">Cancel</button>
+          <button type="submit" class="btn-mint-teal text-xs py-2 px-5">Save User ID Permissions</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN SYSTEM APP CONTAINER -->
+  <div id="mainApp" class="hidden min-h-screen flex w-full">
+
+    <!-- MINTSOFT HOVER AUTO-EXPAND SIDEBAR -->
+    <aside id="sidebar" class="sidebar-mintsoft fixed top-0 left-0 h-screen z-50 flex flex-col no-print">
+      
+      <!-- Sidebar Header -->
+      <div class="bg-[#2c9e8b] py-3.5 px-3.5 flex items-center space-x-3 border-b border-[#228b78]">
+        <div class="w-8 h-8 bg-[#3ba893] rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 64 64" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="24" width="28" height="8" rx="2" fill="white"/>
+            <rect x="10" y="32" width="24" height="20" rx="2" fill="white"/>
+            <rect x="18" y="38" width="8" height="3" rx="1" fill="#3ba893"/>
+            <path d="M36 22C36 20.8954 36.8954 20 38 20H50C51.1046 20 52 20.8954 52 22V50C52 51.1046 51.1046 52 50 52H38C36.8954 52 36 51.1046 36 50V22Z" fill="white"/>
+            <path d="M44 42V30M44 30L40 34M44 30L48 34" stroke="#3ba893" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+
+        <span class="menu-label font-bold text-white tracking-wide text-xs uppercase sidebar-title-bg">
+          Warehouse Label System
+        </span>
+      </div>
+
+      <!-- Navigation Items -->
+      <nav class="flex-1 overflow-y-auto py-2 space-y-1">
+        
+        <div id="btnDashboard" onclick="switchTab('dashboard')" class="nav-item">
+          <i class="fa-solid fa-gauge text-lg min-w-[24px] text-center"></i>
+          <span class="menu-label ml-3.5 text-xs font-medium">Dashboard</span>
+        </div>
+
+        <div id="btnLabelGen" onclick="switchTab('labelGen')" class="nav-item hidden">
+          <i class="fa-solid fa-tags text-lg min-w-[24px] text-center"></i>
+          <span class="menu-label ml-3.5 text-xs font-medium">Box Label Generator</span>
+        </div>
+
+        <div id="btnPdfSplit" onclick="switchTab('pdfSplit')" class="nav-item hidden">
+          <i class="fa-solid fa-scissors text-lg min-w-[24px] text-center"></i>
+          <span class="menu-label ml-3.5 text-xs font-medium">PDF 4×6 Splitter</span>
+        </div>
+
+        <hr id="adminDivider" class="border-[#2c9e8b] my-2 hidden">
+
+        <div id="btnUsers" onclick="switchTab('users')" class="nav-item hidden">
+          <i class="fa-solid fa-users-gear text-lg min-w-[24px] text-center"></i>
+          <span class="menu-label ml-3.5 text-xs font-medium">User Accounts</span>
+        </div>
+
+      </nav>
+
+      <!-- Footer Status -->
+      <div class="p-3 border-t border-[#2c9e8b] text-white/70 text-xs flex items-center space-x-3">
+        <i class="fa-solid fa-circle-check text-emerald-300 min-w-[24px] text-center"></i>
+        <span class="menu-label font-mono text-[11px]">System Active</span>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <div class="flex-1 ml-[60px]">
+
+      <!-- Top Header Bar -->
+      <header class="bg-white border-b border-slate-200 p-4 shadow-sm no-print sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 rounded-full bg-[#228b78]"></div>
+            <h1 id="pageTitle" class="text-lg font-bold text-slate-800">Warehouse Label System</h1>
+          </div>
+
+          <!-- Logged In User Profile -->
+          <div class="flex items-center space-x-3">
+            <div class="text-right">
+              <div id="headerUserName" class="text-xs font-bold text-slate-900">MuhammdJalal</div>
+              <div id="headerUserPermSummary" class="text-[10px] text-purple-600 font-bold">Full Admin Access</div>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-teal-100 text-[#228b78] flex items-center justify-center font-bold text-xs border border-teal-200">
+              <span id="headerUserInitials">MJ</span>
+            </div>
+            <button onclick="logout()" title="Logout" class="p-2 text-slate-400 hover:text-rose-600 transition">
+              <i class="fa-solid fa-right-from-bracket text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="max-w-7xl mx-auto p-4 sm:p-6 no-print">
+
+        <!-- TAB 1: REAL-TIME DASHBOARD -->
+        <section id="viewDashboard" class="space-y-6">
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase text-slate-400">Total Labels Created</div>
+                <div id="dashTotalSplitLabels" class="text-2xl font-black text-slate-900 mt-1">0</div>
+                <div class="text-[10px] text-teal-600 mt-0.5 font-semibold"><i class="fa-solid fa-print"></i> Ready for 4x6 Thermal</div>
+              </div>
+              <div class="p-3 bg-teal-50 text-[#228b78] rounded-xl"><i class="fa-solid fa-tags text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase text-slate-400">PDF Pages Split</div>
+                <div id="dashSourcePages" class="text-2xl font-black text-slate-900 mt-1">0 <span class="text-xs font-normal text-slate-500">Pages</span></div>
+                <div class="text-[10px] text-indigo-600 mt-0.5 font-semibold"><i class="fa-solid fa-file-pdf"></i> Processed Local</div>
+              </div>
+              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><i class="fa-solid fa-scissors text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase text-slate-400">PDF Split Batches</div>
+                <div id="dashBatchesCount" class="text-2xl font-black text-slate-900 mt-1">0 <span class="text-xs font-normal text-slate-500">Files</span></div>
+                <div class="text-[10px] text-amber-600 mt-0.5 font-semibold"><i class="fa-solid fa-clock-rotate-left"></i> Session Total</div>
+              </div>
+              <div class="p-3 bg-amber-50 text-amber-600 rounded-xl"><i class="fa-solid fa-folder-open text-xl"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase text-slate-400">CSV Boxes Qty</div>
+                <div id="dashCsvUnits" class="text-2xl font-black text-slate-900 mt-1">0 <span class="text-xs font-normal text-slate-500">Pcs</span></div>
+                <div class="text-[10px] text-purple-600 mt-0.5 font-semibold"><i class="fa-solid fa-box text-xl"></i> Box Label Qty</div>
+              </div>
+              <div class="p-3 bg-purple-50 text-purple-600 rounded-xl"><i class="fa-solid fa-boxes-packing text-xl"></i></div>
+            </div>
+          </div>
+
+          <!-- Activity Log Table -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Recent Label Split History</h2>
+                <p class="text-xs text-slate-500">Live log of PDFs split and box labels generated during this session</p>
+              </div>
+              <button onclick="clearActivityLog()" class="btn-mint-red text-xs py-1.5 px-3 flex items-center space-x-1">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Clear History</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
+                    <th class="py-3 px-4 font-bold">Time</th>
+                    <th class="py-3 px-4 font-bold">File / Action</th>
+                    <th class="py-3 px-4 font-bold">Type</th>
+                    <th class="py-3 px-4 font-bold text-center">Original Pages</th>
+                    <th class="py-3 px-4 font-bold text-right">4x6 Labels Split</th>
+                  </tr>
+                </thead>
+                <tbody id="activityLogBody" class="divide-y divide-slate-100 text-slate-700">
+                  <tr id="emptyLogRow"><td colspan="5" class="py-8 text-center text-slate-400">No label operations performed yet. Use the Box Label Generator or PDF Splitter to begin.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: BOX LABEL GENERATOR -->
+        <section id="viewLabelGen" class="hidden space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div class="flex items-center justify-between border-b pb-2">
+                <div class="flex items-center space-x-2 text-slate-900 font-semibold">
+                  <span class="w-6 h-6 rounded-full bg-[#228b78] text-white text-xs flex items-center justify-center">1</span>
+                  <h2>Upload Packing CSV</h2>
+                </div>
+                <button onclick="downloadTemplate()" class="btn-mint-amber text-[11px] py-1 px-2.5 flex items-center space-x-1">
+                  <i class="fa-solid fa-download"></i>
+                  <span>Extras / Template</span>
+                </button>
+              </div>
+              
+              <label class="border-2 border-dashed border-teal-200 hover:border-[#228b78] bg-teal-50/30 hover:bg-teal-50/60 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition text-center">
+                <i class="fa-solid fa-file-csv text-3xl text-[#228b78] mb-2"></i>
+                <span class="text-xs font-semibold text-[#228b78]">Click or Drop CSV File</span>
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+              </label>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div class="flex items-center space-x-2 text-slate-900 font-bold border-b pb-2">
+                <span class="w-6 h-6 rounded-full bg-[#228b78] text-white text-xs flex items-center justify-center">2</span>
+                <h2 class="text-base font-bold">Meta Settings</h2>
+              </div>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-black text-slate-800 uppercase tracking-wide mb-1.5">Order Reference ID</label>
+                  <input type="text" id="orderRefInput" value="" placeholder="e.g. OUS-440025-A" oninput="renderLabels()" class="w-full text-base font-extrabold text-slate-900 border-2 border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-[#228b78] focus:border-[#228b78] focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-sm font-black text-slate-800 uppercase tracking-wide mb-1.5">Label Subtitle Header</label>
+                  <input type="text" id="labelSubtitleInput" value="B2B PACKING LABEL" oninput="renderLabels()" class="w-full text-base font-extrabold text-slate-900 border-2 border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-[#228b78] focus:border-[#228b78] focus:outline-none">
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center space-x-2 text-slate-900 font-semibold border-b pb-2">
+                  <span class="w-6 h-6 rounded-full bg-[#228b78] text-white text-xs flex items-center justify-center">3</span>
+                  <h2>Actions & Print</h2>
+                </div>
+                <div class="mt-3 text-xs space-y-1">
+                  <div class="flex justify-between text-slate-600">
+                    <span>Total Boxes Loaded:</span>
+                    <span id="statTotalBoxes" class="font-bold text-slate-900">0</span>
+                  </div>
+                  <div class="flex justify-between text-slate-600">
+                    <span>Total Items Count:</span>
+                    <span id="statTotalItems" class="font-bold text-slate-900">0 Pcs</span>
+                  </div>
+                </div>
+              </div>
+
+              <button id="btnPrintBoxLabels" onclick="window.print()" class="btn-mint-teal w-full text-xs flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed" disabled>
+                <i class="fa-solid fa-print text-sm"></i>
+                <span>PRINT 4×6 LABELS / SAVE PDF</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: PDF SPLITTER -->
+        <section id="viewPdfSplit" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6">
+            <div class="text-center space-y-1">
+              <span class="px-3 py-1 bg-teal-100 text-[#228b78] font-bold text-xs rounded-full">EXACT 4 x 6 INCH OUTPUT</span>
+              <h2 class="text-2xl font-extrabold text-slate-900 mt-2">Split PDF Into Thermal Labels</h2>
+            </div>
+
+            <label id="dropPdf" for="filePdf" class="border-2 border-dashed border-teal-200 hover:border-[#228b78] bg-teal-50/30 hover:bg-teal-50/60 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition text-center">
+              <i class="fa-solid fa-file-pdf text-4xl text-[#228b78] mb-2"></i>
+              <span class="text-xs font-semibold text-[#228b78]">Choose a PDF or drag it here</span>
+              <input id="filePdf" type="file" accept="application/pdf,.pdf" class="hidden">
+            </label>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="border border-slate-200 rounded-lg p-3">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Split Method</label>
+                <select id="direction" class="w-full text-xs font-semibold bg-transparent focus:outline-none">
+                  <option value="horizontal">Top / Bottom (2 Labels)</option>
+                  <option value="vertical">Left / Right (2 Labels)</option>
+                </select>
+              </div>
+
+              <div class="border border-slate-200 rounded-lg p-3">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rotate</label>
+                <select id="rotation" class="w-full text-xs font-semibold bg-transparent focus:outline-none">
+                  <option value="270">270° (recommended)</option>
+                  <option value="90">90°</option>
+                  <option value="0">0°</option>
+                  <option value="180">180°</option>
+                </select>
+              </div>
+
+              <div class="border border-slate-200 rounded-lg p-3">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Page Order</label>
+                <select id="order" class="w-full text-xs font-semibold bg-transparent focus:outline-none">
+                  <option value="first-second">First half, second half</option>
+                  <option value="second-first">Second half, first half</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button id="split" onclick="make4x6(2)" class="btn-mint-teal text-xs opacity-50 cursor-not-allowed" disabled>
+                <span>Split 2 Labels → 4 x 6</span>
+              </button>
+              <button id="split4" onclick="make4x6(4)" class="btn-mint-blue text-xs opacity-50 cursor-not-allowed" disabled>
+                <span>Split 4 Labels → 4 x 6</span>
+              </button>
+              <button id="reset" onclick="resetPdfSplitter()" class="btn-mint-red text-xs">
+                <span>Reset</span>
+              </button>
+              <div id="fileinfo" class="text-xs text-slate-500 font-medium ml-auto">No PDF selected</div>
+            </div>
+
+            <div id="status" class="status"></div>
+          </div>
+        </section>
+
+        <!-- TAB 4: USER ACCOUNTS -->
+        <section id="viewUsers" class="hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+              <div>
+                <h2 class="text-lg font-bold text-slate-900">User Accounts Management</h2>
+                <p class="text-xs text-slate-500">Configure User IDs and explicit tool permissions per person</p>
+              </div>
+              <button onclick="openAddUserModal()" class="btn-mint-teal text-xs py-2 px-4 flex items-center space-x-2">
+                <i class="fa-solid fa-user-plus"></i>
+                <span>Create User Account</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
+                    <th class="py-3 px-4 font-bold">User Name</th>
+                    <th class="py-3 px-4 font-bold">Tool Access Permissions</th>
+                    <th class="py-3 px-4 font-bold">Status</th>
+                    <th class="py-3 px-4 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="userTableBody" class="divide-y divide-slate-100 text-slate-700">
+                  <!-- User Rows Rendered Dynamically From Storage -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Thermal Labels Rendered Section -->
+      <section id="labelContainer" class="max-w-7xl mx-auto p-4 flex flex-wrap justify-center gap-6">
+        <!-- Live Labels Rendered Here -->
+      </section>
+
+    </div>
+
+  </div>
+
+  <script>
+    /* ---------------------------------------------------------
+       PERSISTENT DATA MANAGEMENT (LOCALSTORAGE ENGINE)
+    --------------------------------------------------------- */
+    
+    // 1. User Database Persistence
+    const defaultAdminDb = {
+      'muhammdjalal': { 
+        name: 'MuhammdJalal', 
+        pass: 'Jalal123!!', 
+        initials: 'MJ', 
+        hasBoxGen: true, 
+        hasPdfSplit: true, 
+        isAdmin: true 
+      }
+    };
+
+    let usersDb = JSON.parse(localStorage.getItem('wh_usersDb')) || defaultAdminDb;
+
+    function saveUsersToStorage() {
+      localStorage.setItem('wh_usersDb', JSON.stringify(usersDb));
+    }
+
+    // 2. Dashboard KPI Counters Persistence
+    let totalSplitLabelsCount = parseInt(localStorage.getItem('wh_totalSplitLabels')) || 0;
+    let totalSourcePagesCount = parseInt(localStorage.getItem('wh_totalSourcePages')) || 0;
+    let totalPdfBatchesCount  = parseInt(localStorage.getItem('wh_totalPdfBatches'))  || 0;
+    let totalCsvUnitsCount   = parseInt(localStorage.getItem('wh_totalCsvUnits'))   || 0;
+
+    function updateDashboardCards() {
+      document.getElementById('dashTotalSplitLabels').innerText = totalSplitLabelsCount;
+      document.getElementById('dashSourcePages').innerText = totalSourcePagesCount;
+      document.getElementById('dashBatchesCount').innerText = totalPdfBatchesCount;
+      document.getElementById('dashCsvUnits').innerText = totalCsvUnitsCount;
+
+      localStorage.setItem('wh_totalSplitLabels', totalSplitLabelsCount);
+      localStorage.setItem('wh_totalSourcePages', totalSourcePagesCount);
+      localStorage.setItem('wh_totalPdfBatches', totalPdfBatchesCount);
+      localStorage.setItem('wh_totalCsvUnits', totalCsvUnitsCount);
+    }
+
+    // 3. Activity Log Persistence
+    function addActivityLog(fileName, actionType, sourcePages, outputLabels) {
+      const logHistory = JSON.parse(localStorage.getItem('wh_activityLogs')) || [];
+      const newLog = {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        fileName,
+        actionType,
+        sourcePages,
+        outputLabels
+      };
+      
+      logHistory.unshift(newLog);
+      localStorage.setItem('wh_activityLogs', JSON.stringify(logHistory));
+      renderActivityLogs();
+    }
+
+    function renderActivityLogs() {
+      const body = document.getElementById('activityLogBody');
+      const logHistory = JSON.parse(localStorage.getItem('wh_activityLogs')) || [];
+      
+      if (logHistory.length === 0) {
+        body.innerHTML = '<tr id="emptyLogRow"><td colspan="5" class="py-8 text-center text-slate-400">No label operations performed yet. Use the Box Label Generator or PDF Splitter to begin.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = logHistory.map(log => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2.5 px-4 font-mono text-slate-500">${log.time}</td>
+          <td class="py-2.5 px-4 font-bold text-slate-800">${log.fileName}</td>
+          <td class="py-2.5 px-4"><span class="px-2 py-0.5 bg-teal-50 text-[#228b78] rounded text-[10px] font-bold uppercase">${log.actionType}</span></td>
+          <td class="py-2.5 px-4 text-center font-bold text-slate-600">${log.sourcePages}</td>
+          <td class="py-2.5 px-4 text-right font-black text-emerald-600">${log.outputLabels} Labels</td>
+        </tr>
+      `).join('');
+    }
+
+    function clearActivityLog() {
+      localStorage.removeItem('wh_activityLogs');
+      totalSplitLabelsCount = 0;
+      totalSourcePagesCount = 0;
+      totalPdfBatchesCount = 0;
+      totalCsvUnitsCount = 0;
+      updateDashboardCards();
+      renderActivityLogs();
+    }
+
+    /* ---------------------------------------------------------
+       SYSTEM APP INITIALIZATION
+    --------------------------------------------------------- */
+    let currentUser = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderActivityLogs();
+      renderUserTable();
+      updateDashboardCards();
+      updateStats(0, 0);
+      renderLabels();
+
+      // Restore active user session across refresh
+      const savedUserKey = localStorage.getItem('wh_sessionUserKey');
+      if (savedUserKey && usersDb[savedUserKey]) {
+        currentUser = usersDb[savedUserKey];
+        document.getElementById('headerUserName').innerText = currentUser.name;
+        document.getElementById('headerUserInitials').innerText = currentUser.initials;
+        applyUserPermissions(currentUser);
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+      }
+    });
+
+    // Password visibility toggle
+    function togglePasswordVisibility(inputId, iconId) {
+      const field = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      if (field.type === "password") {
+        field.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+      } else {
+        field.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+      }
+    }
+
+    // Login & Session handling
+    function handleLogin(event) {
+      event.preventDefault();
+      const userVal = document.getElementById('loginUser').value.trim().toLowerCase();
+      const passVal = document.getElementById('loginPass').value.trim();
+
+      if (usersDb[userVal] && usersDb[userVal].pass === passVal) {
+        currentUser = usersDb[userVal];
+        localStorage.setItem('wh_sessionUserKey', userVal); // Persist session
+
+        document.getElementById('headerUserName').innerText = currentUser.name;
+        document.getElementById('headerUserInitials').innerText = currentUser.initials;
+
+        applyUserPermissions(currentUser);
+
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        document.getElementById('loginError').classList.add('hidden');
+      } else {
+        document.getElementById('loginError').classList.remove('hidden');
+      }
+    }
+
+    function applyUserPermissions(user) {
+      const navLabelGen = document.getElementById('btnLabelGen');
+      const navPdfSplit = document.getElementById('btnPdfSplit');
+      const navUsers = document.getElementById('btnUsers');
+      const adminDivider = document.getElementById('adminDivider');
+
+      navLabelGen.classList.add('hidden');
+      navPdfSplit.classList.add('hidden');
+      navUsers.classList.add('hidden');
+      adminDivider.classList.add('hidden');
+
+      let allowedToolsSummary = [];
+
+      if (user.isAdmin || user.hasBoxGen) {
+        navLabelGen.classList.remove('hidden');
+        allowedToolsSummary.push('Box Label Gen');
+      }
+
+      if (user.isAdmin || user.hasPdfSplit) {
+        navPdfSplit.classList.remove('hidden');
+        allowedToolsSummary.push('PDF Splitter');
+      }
+
+      if (user.isAdmin) {
+        navUsers.classList.remove('hidden');
+        adminDivider.classList.remove('hidden');
+        allowedToolsSummary = ['Full Admin Access'];
+      }
+
+      document.getElementById('headerUserPermSummary').innerText = allowedToolsSummary.join(' + ') || 'Dashboard Access Only';
+      switchTab('dashboard');
+    }
+
+    function logout() {
+      currentUser = null;
+      localStorage.removeItem('wh_sessionUserKey'); // Clear session
+      document.getElementById('mainApp').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+    }
+
+    /* ---------------------------------------------------------
+       USER MANAGEMENT ENGINE
+    --------------------------------------------------------- */
+    function renderUserTable() {
+      const tbody = document.getElementById('userTableBody');
+      tbody.innerHTML = '';
+
+      Object.keys(usersDb).forEach(key => {
+        const u = usersDb[key];
+        const toolsList = [];
+        if (u.hasBoxGen) toolsList.push('Box Label Gen');
+        if (u.hasPdfSplit) toolsList.push('PDF Splitter');
+        if (u.isAdmin) toolsList.push('Full Admin');
+
+        const toolsTags = toolsList.map(t => `<span class="px-2 py-0.5 bg-teal-50 text-[#228b78] rounded text-[10px] font-bold">${t}</span>`).join(' ');
+
+        const tr = document.createElement('tr');
+        tr.id = `userRow-${key}`;
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-full bg-teal-100 text-[#228b78] flex items-center justify-center font-bold">${u.initials}</div>
+            <div>
+              <div class="font-bold text-slate-900">${u.name}</div>
+              <div class="text-[10px] text-slate-400">${u.isAdmin ? 'Full System Admin' : 'Password Protected'}</div>
+            </div>
+          </td>
+          <td class="py-3 px-4 space-x-1" id="userTools-${key}">${toolsTags || '<span class="text-slate-400">None</span>'}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold">Active</span></td>
+          <td class="py-3 px-4 text-right space-x-2">
+            <button onclick="editUser('${key}')" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px]">Configure Permissions</button>
+            ${key !== 'muhammdjalal' ? `<button onclick="deleteUser('${key}')" class="text-rose-600 hover:text-rose-800 font-bold text-[11px]">Delete</button>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openAddUserModal() {
+      document.getElementById('editingUserKey').value = '';
+      document.getElementById('modalTitle').innerText = 'Add New User & Assign Access';
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('newUsername').readOnly = false;
+      document.getElementById('permBoxLabel').checked = true;
+      document.getElementById('permPdfSplit').checked = false;
+      document.getElementById('permAdmin').checked = false;
+      document.getElementById('addUserModal').classList.remove('hidden');
+    }
+
+    function editUser(userKey) {
+      const u = usersDb[userKey];
+      if (!u) return;
+      document.getElementById('editingUserKey').value = userKey;
+      document.getElementById('modalTitle').innerText = `Configure Permissions: ${u.name}`;
+      document.getElementById('newUsername').value = u.name;
+      document.getElementById('newUsername').readOnly = true;
+      document.getElementById('newPassword').value = u.pass;
+      document.getElementById('permBoxLabel').checked = u.hasBoxGen;
+      document.getElementById('permPdfSplit').checked = u.hasPdfSplit;
+      document.getElementById('permAdmin').checked = u.isAdmin;
+      document.getElementById('addUserModal').classList.remove('hidden');
+    }
+
+    function closeAddUserModal() {
+      document.getElementById('addUserModal').classList.add('hidden');
+    }
+
+    function saveUser(e) {
+      e.preventDefault();
+      const editingKey = document.getElementById('editingUserKey').value;
+      const uname = document.getElementById('newUsername').value.trim();
+      const pass = document.getElementById('newPassword').value.trim();
+
+      if (!uname || !pass) return;
+
+      const key = editingKey || uname.toLowerCase();
+      const initials = uname.substring(0,2).toUpperCase();
+
+      const hasBoxGen = document.getElementById('permBoxLabel').checked;
+      const hasPdfSplit = document.getElementById('permPdfSplit').checked;
+      const isAdmin = document.getElementById('permAdmin').checked;
+
+      usersDb[key] = {
+        name: uname,
+        pass: pass,
+        initials: initials,
+        hasBoxGen: hasBoxGen,
+        hasPdfSplit: hasPdfSplit,
+        isAdmin: isAdmin
+      };
+
+      saveUsersToStorage();
+      renderUserTable();
+
+      if (currentUser && currentUser.name.toLowerCase() === key) {
+        currentUser = usersDb[key];
+        applyUserPermissions(currentUser);
+      }
+
+      closeAddUserModal();
+    }
+
+    function deleteUser(userKey) {
+      if (confirm(`Are you sure you want to delete "${usersDb[userKey]?.name || userKey}"?`)) {
+        delete usersDb[userKey];
+        saveUsersToStorage();
+        renderUserTable();
+      }
+    }
+
+    function switchTab(tab) {
+      const views = {
+        dashboard: { view: 'viewDashboard', btn: 'btnDashboard', title: 'Warehouse Label System' },
+        labelGen: { view: 'viewLabelGen', btn: 'btnLabelGen', title: 'Box Label Generator' },
+        pdfSplit: { view: 'viewPdfSplit', btn: 'btnPdfSplit', title: 'PDF 4×6 Label Splitter' },
+        users: { view: 'viewUsers', btn: 'btnUsers', title: 'User Accounts' }
+      };
+
+      Object.keys(views).forEach(k => {
+        const v = document.getElementById(views[k].view);
+        const b = document.getElementById(views[k].btn);
+        if (k === tab) {
+          v.classList.remove('hidden');
+          b.classList.add('active');
+          document.getElementById('pageTitle').innerText = views[k].title;
+        } else {
+          v.classList.add('hidden');
+          b.classList.remove('active');
+        }
+      });
+
+      const container = document.getElementById('labelContainer');
+      container.style.display = tab === 'labelGen' ? "flex" : "none";
+    }
+
+    /* ---------------------------------------------------------
+       1. BOX LABEL GENERATOR ENGINE
+    --------------------------------------------------------- */
+    let boxGroups = {};
+
+    function downloadTemplate() {
+      const csvHeader = "Box,Weight,SKU,QTY\n";
+      const blob = new Blob([csvHeader], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "packing_label_template.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        parseCSV(e.target.result, file.name);
+      };
+      reader.readAsText(file);
+    }
+
+    function parseCSV(text, fileName) {
+      const lines = text.split(/\r\n|\n/);
+      if (lines.length < 2) return;
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      boxGroups = {};
+      let totalPcs = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
+        const cleanRow = row.map(r => r.trim().replace(/^"|"$/g, ''));
+
+        const item = {};
+        headers.forEach((h, idx) => { item[h] = cleanRow[idx] || ''; });
+
+        const boxNum = item['Box'] || item['BOX_NUMBER'] || item['BOX'] || '1';
+        const weight = item['Weight'] || item['WEIGHT'] || '0';
+        const sku = item['SKU'] || '';
+        const qty = parseInt(item['QTY'] || item['Qty'] || '0') || 0;
+
+        if (!boxGroups[boxNum]) {
+          boxGroups[boxNum] = { box_num: boxNum, weight: weight, items: [] };
+        }
+
+        if (sku) {
+          boxGroups[boxNum].items.push({ sku, qty });
+          totalPcs += qty;
+        }
+      }
+
+      const totalBoxesCount = Object.keys(boxGroups).length;
+      Object.values(boxGroups).forEach(b => b.total_boxes = totalBoxesCount);
+
+      const printBtn = document.getElementById('btnPrintBoxLabels');
+      if (totalBoxesCount > 0) {
+        printBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        printBtn.disabled = false;
+      }
+
+      totalCsvUnitsCount += totalPcs;
+      totalSplitLabelsCount += totalBoxesCount;
+      updateDashboardCards();
+
+      addActivityLog(fileName || 'Box CSV Import', 'CSV Box Gen', totalBoxesCount, totalBoxesCount);
+
+      updateStats(totalBoxesCount, totalPcs);
+      renderLabels();
+    }
+
+    function updateStats(boxes, pcs) {
+      const boxKeys = Object.keys(boxGroups);
+      document.getElementById('statTotalBoxes').innerText = boxes !== undefined ? boxes : boxKeys.length;
+      
+      let totalPcs = pcs;
+      if (totalPcs === undefined) {
+        totalPcs = 0;
+        boxKeys.forEach(k => {
+          boxGroups[k].items.forEach(i => totalPcs += i.qty);
+        });
+      }
+      document.getElementById('statTotalItems').innerText = totalPcs + ' Pcs';
+    }
+
+    function renderLabels() {
+      const container = document.getElementById('labelContainer');
+      container.innerHTML = '';
+
+      const orderRef = document.getElementById('orderRefInput').value || '';
+      const labelSubtitle = document.getElementById('labelSubtitleInput').value || '';
+      const sortedBoxKeys = Object.keys(boxGroups).sort((a,b) => parseInt(a) - parseInt(b));
+
+      if (sortedBoxKeys.length === 0) {
+        container.innerHTML = '<div class="text-slate-400 text-xs py-12">No data loaded. Upload a CSV file to generate thermal box labels.</div>';
+        return;
+      }
+
+      sortedBoxKeys.forEach((key) => {
+        const box = boxGroups[key];
+        const boxTotalQty = box.items.reduce((sum, item) => sum + item.qty, 0);
+
+        const page = document.createElement('div');
+        page.className = "label-page bg-white p-4 border border-slate-300 shadow-lg flex flex-col justify-between text-slate-900";
+
+        let itemsHtml = box.items.map(i => `
+          <tr class="border-b border-slate-200 text-xs">
+            <td class="py-1.5 px-2 font-bold font-mono border-r border-slate-200">${i.sku}</td>
+            <td class="py-1.5 px-2 text-center font-bold text-sm">${i.qty}</td>
+          </tr>
+        `).join('');
+
+        page.innerHTML = `
+          <div class="space-y-3">
+            <div class="p-2 text-center space-y-1">
+              <div class="text-lg font-black tracking-wider uppercase text-[#557089]">${labelSubtitle}</div>
+              ${orderRef ? `<div class="text-sm font-black text-[#557089] tracking-widest">REF: ${orderRef}</div>` : ''}
+            </div>
+
+            <div class="bg-slate-100 p-2.5 rounded border border-slate-200 flex justify-between items-center">
+              <div>
+                <div class="text-base font-black tracking-tight">BOX ${box.box_num} OF ${box.total_boxes}</div>
+              </div>
+              <div class="text-right text-[10px]">
+                <div>TOTAL QTY: <b class="text-xs">${boxTotalQty} Pcs</b></div>
+                ${box.weight ? `<div>WEIGHT: <b>${box.weight} kg</b></div>` : ''}
+              </div>
+            </div>
+
+            <table class="w-full text-left border-collapse border border-slate-200">
+              <thead>
+                <tr class="bg-slate-200 text-[10px] uppercase font-bold text-slate-800 border-b border-slate-300">
+                  <th class="py-1 px-2 border-r border-slate-300 w-3/4">SKU</th>
+                  <th class="py-1 px-2 text-center w-1/4">QTY</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        container.appendChild(page);
+      });
+    }
+
+    /* ---------------------------------------------------------
+       2. PDF LABEL SPLITTER ENGINE
+    --------------------------------------------------------- */
+    const fileInputPdf = document.getElementById('filePdf');
+    const dropPdf = document.getElementById('dropPdf');
+    const splitBtn = document.getElementById('split');
+    const split4Btn = document.getElementById('split4');
+    const fileinfo = document.getElementById('fileinfo');
+    const status = document.getElementById('status');
+    let selectedPdf = null;
+
+    function stat(t, type='work') {
+      status.className = 'status show ' + type;
+      status.textContent = t;
+    }
+
+    function clearStat() {
+      status.className = 'status';
+      status.textContent = '';
+    }
+
+    function setButtons(enabled) {
+      splitBtn.disabled = !enabled;
+      split4Btn.disabled = !enabled;
+
+      if (enabled) {
+        splitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        split4Btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        splitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        split4Btn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function usePdfFile(f) {
+      clearStat();
+      if (!f || (!f.name.toLowerCase().endsWith('.pdf') && f.type !== 'application/pdf')) {
+        selectedPdf = null;
+        setButtons(false);
+        fileinfo.textContent = 'No PDF selected';
+        if (f) stat('Please select a valid PDF file.', 'bad');
+        return;
+      }
+      selectedPdf = f;
+      setButtons(true);
+      fileinfo.textContent = f.name + ' • ' + (f.size / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    fileInputPdf.addEventListener('change', e => usePdfFile(e.target.files[0]));
+    ['dragenter', 'dragover'].forEach(x => dropPdf.addEventListener(x, e => { e.preventDefault(); dropPdf.classList.add('bg-teal-100'); }));
+    ['dragleave', 'drop'].forEach(x => dropPdf.addEventListener(x, e => { e.preventDefault(); dropPdf.classList.remove('bg-teal-100'); }));
+    dropPdf.addEventListener('drop', e => usePdfFile(e.dataTransfer.files[0]));
+
+    function resetPdfSplitter() {
+      selectedPdf = null;
+      fileInputPdf.value = '';
+      setButtons(false);
+      fileinfo.textContent = 'No PDF selected';
+      clearStat();
+    }
+
+    async function make4x6(mode) {
+      if (!selectedPdf) return;
+      setButtons(false);
+      try {
+        stat('Opening PDF…');
+        const srcBytes = await selectedPdf.arrayBuffer();
+        const src = await PDFLib.PDFDocument.load(srcBytes);
+        const out = await PDFLib.PDFDocument.create();
+        const total = src.getPageCount();
+        const direction = document.getElementById('direction').value;
+        const rotation = +document.getElementById('rotation').value;
+        const order = document.getElementById('order').value;
+        const PAGE_W = 4 * 72, PAGE_H = 6 * 72, MARGIN = 6;
+
+        for (let i = 0; i < total; i++) {
+          const page = src.getPage(i), { width, height } = page.getSize();
+          let boxes;
+          if (mode === 4) {
+            boxes = [
+              { left: 0, bottom: height / 2, right: width / 2, top: height },
+              { left: width / 2, bottom: height / 2, right: width, top: height },
+              { left: 0, bottom: 0, right: width / 2, top: height / 2 },
+              { left: width / 2, bottom: 0, right: width, top: height / 2 }
+            ];
+            if (order === 'second-first') boxes = boxes.slice().reverse();
+          } else {
+            boxes = direction === 'horizontal'
+              ? [{ left: 0, bottom: height / 2, right: width, top: height }, { left: 0, bottom: 0, right: width, top: height / 2 }]
+              : [{ left: 0, bottom: 0, right: width / 2, top: height }, { left: width / 2, bottom: 0, right: width, top: height }];
+            if (order === 'second-first') boxes = [boxes[1], boxes[0]];
+          }
+
+          for (const box of boxes) {
+            const emb = await out.embedPage(page, box);
+            const cw = box.right - box.left, ch = box.top - box.bottom;
+            const turned = rotation === 90 || rotation === 270;
+            const rw = turned ? ch : cw, rh = turned ? cw : ch;
+            const scale = Math.min((PAGE_W - 2 * MARGIN) / rw, (PAGE_H - 2 * MARGIN) / rh);
+            const sw = cw * scale, sh = ch * scale, srw = rw * scale, srh = rh * scale;
+            const ox = (PAGE_W - srw) / 2, oy = (PAGE_H - srh) / 2;
+            const p = out.addPage([PAGE_W, PAGE_H]);
+
+            if (rotation === 0) p.drawPage(emb, { x: ox, y: oy, width: sw, height: sh });
+            else if (rotation === 90) p.drawPage(emb, { x: ox + srw, y: oy, width: sw, height: sh, rotate: PDFLib.degrees(90) });
+            else if (rotation === 180) p.drawPage(emb, { x: ox + srw, y: oy + srh, width: sw, height: sh, rotate: PDFLib.degrees(180) });
+            else p.drawPage(emb, { x: ox, y: oy + srh, width: sw, height: sh, rotate: PDFLib.degrees(270) });
+          }
+          stat('Processing page ' + (i + 1) + ' of ' + total + '…');
+          await new Promise(r => setTimeout(r, 0));
+        }
+
+        const bytes = await out.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = selectedPdf.name.replace(/\.pdf$/i, '') + (mode === 4 ? '_4x6_split_4_labels.pdf' : '_4x6_split_2_labels.pdf');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+        const totalGeneratedLabels = total * mode;
+
+        totalSplitLabelsCount += totalGeneratedLabels;
+        totalSourcePagesCount += total;
+        totalPdfBatchesCount += 1;
+        updateDashboardCards();
+
+        addActivityLog(selectedPdf.name, mode === 4 ? '4-Label Split' : '2-Label Split', total, totalGeneratedLabels);
+
+        stat('Done. ' + total + ' source pages became ' + totalGeneratedLabels + ' labels, each exactly 4 x 6 inches.', 'good');
+      } catch (e) {
+        console.error(e);
+        stat('Could not process this PDF.', 'bad');
+      } finally {
+        setButtons(!!selectedPdf);
+      }
+    }
+  </script>
+</body>
+</html>
