@@ -584,7 +584,7 @@
                   </tr>
                 </thead>
                 <tbody id="userTableBody" class="divide-y divide-slate-100 text-slate-700">
-                  <!-- User Rows Rendered Dynamically From Storage -->
+                  <!-- User Rows Rendered Dynamically In Memory -->
                 </tbody>
               </table>
             </div>
@@ -604,10 +604,10 @@
 
   <script>
     /* ---------------------------------------------------------
-       PERSISTENT DATA MANAGEMENT (LOCALSTORAGE ENGINE)
+       IN-MEMORY SESSION DATA (NO LOCAL STORAGE PERSISTENCE)
     --------------------------------------------------------- */
     
-    // 1. User Database Persistence
+    // 1. In-Memory User Database
     const defaultAdminDb = {
       'muhammdjalal': { 
         name: 'MuhammdJalal', 
@@ -619,33 +619,25 @@
       }
     };
 
-    let usersDb = JSON.parse(localStorage.getItem('wh_usersDb')) || defaultAdminDb;
+    let usersDb = { ...defaultAdminDb };
 
-    function saveUsersToStorage() {
-      localStorage.setItem('wh_usersDb', JSON.stringify(usersDb));
-    }
-
-    // 2. Dashboard KPI Counters Persistence
-    let totalSplitLabelsCount = parseInt(localStorage.getItem('wh_totalSplitLabels')) || 0;
-    let totalSourcePagesCount = parseInt(localStorage.getItem('wh_totalSourcePages')) || 0;
-    let totalPdfBatchesCount  = parseInt(localStorage.getItem('wh_totalPdfBatches'))  || 0;
-    let totalCsvUnitsCount   = parseInt(localStorage.getItem('wh_totalCsvUnits'))   || 0;
+    // 2. Dashboard In-Memory KPI Counters
+    let totalSplitLabelsCount = 0;
+    let totalSourcePagesCount = 0;
+    let totalPdfBatchesCount  = 0;
+    let totalCsvUnitsCount    = 0;
 
     function updateDashboardCards() {
       document.getElementById('dashTotalSplitLabels').innerText = totalSplitLabelsCount;
       document.getElementById('dashSourcePages').innerText = totalSourcePagesCount;
       document.getElementById('dashBatchesCount').innerText = totalPdfBatchesCount;
       document.getElementById('dashCsvUnits').innerText = totalCsvUnitsCount;
-
-      localStorage.setItem('wh_totalSplitLabels', totalSplitLabelsCount);
-      localStorage.setItem('wh_totalSourcePages', totalSourcePagesCount);
-      localStorage.setItem('wh_totalPdfBatches', totalPdfBatchesCount);
-      localStorage.setItem('wh_totalCsvUnits', totalCsvUnitsCount);
     }
 
-    // 3. Activity Log Persistence
+    // 3. In-Memory Activity Log
+    let activityLogs = [];
+
     function addActivityLog(fileName, actionType, sourcePages, outputLabels) {
-      const logHistory = JSON.parse(localStorage.getItem('wh_activityLogs')) || [];
       const newLog = {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         fileName,
@@ -654,21 +646,19 @@
         outputLabels
       };
       
-      logHistory.unshift(newLog);
-      localStorage.setItem('wh_activityLogs', JSON.stringify(logHistory));
+      activityLogs.unshift(newLog);
       renderActivityLogs();
     }
 
     function renderActivityLogs() {
       const body = document.getElementById('activityLogBody');
-      const logHistory = JSON.parse(localStorage.getItem('wh_activityLogs')) || [];
       
-      if (logHistory.length === 0) {
+      if (activityLogs.length === 0) {
         body.innerHTML = '<tr id="emptyLogRow"><td colspan="5" class="py-8 text-center text-slate-400">No label operations performed yet. Use the Box Label Generator or PDF Splitter to begin.</td></tr>';
         return;
       }
 
-      body.innerHTML = logHistory.map(log => `
+      body.innerHTML = activityLogs.map(log => `
         <tr class="hover:bg-slate-50 transition">
           <td class="py-2.5 px-4 font-mono text-slate-500">${log.time}</td>
           <td class="py-2.5 px-4 font-bold text-slate-800">${log.fileName}</td>
@@ -680,7 +670,7 @@
     }
 
     function clearActivityLog() {
-      localStorage.removeItem('wh_activityLogs');
+      activityLogs = [];
       totalSplitLabelsCount = 0;
       totalSourcePagesCount = 0;
       totalPdfBatchesCount = 0;
@@ -700,17 +690,6 @@
       updateDashboardCards();
       updateStats(0, 0);
       renderLabels();
-
-      // Restore active user session across refresh
-      const savedUserKey = localStorage.getItem('wh_sessionUserKey');
-      if (savedUserKey && usersDb[savedUserKey]) {
-        currentUser = usersDb[savedUserKey];
-        document.getElementById('headerUserName').innerText = currentUser.name;
-        document.getElementById('headerUserInitials').innerText = currentUser.initials;
-        applyUserPermissions(currentUser);
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('mainApp').classList.remove('hidden');
-      }
     });
 
     // Password visibility toggle
@@ -728,7 +707,7 @@
       }
     }
 
-    // Login & Session handling
+    // Login & Session handling (In-Memory Only)
     function handleLogin(event) {
       event.preventDefault();
       const userVal = document.getElementById('loginUser').value.trim().toLowerCase();
@@ -736,7 +715,6 @@
 
       if (usersDb[userVal] && usersDb[userVal].pass === passVal) {
         currentUser = usersDb[userVal];
-        localStorage.setItem('wh_sessionUserKey', userVal); // Persist session
 
         document.getElementById('headerUserName').innerText = currentUser.name;
         document.getElementById('headerUserInitials').innerText = currentUser.initials;
@@ -786,7 +764,6 @@
 
     function logout() {
       currentUser = null;
-      localStorage.removeItem('wh_sessionUserKey'); // Clear session
       document.getElementById('mainApp').classList.add('hidden');
       document.getElementById('loginScreen').classList.remove('hidden');
       document.getElementById('loginUser').value = '';
@@ -794,7 +771,7 @@
     }
 
     /* ---------------------------------------------------------
-       USER MANAGEMENT ENGINE
+       USER MANAGEMENT ENGINE (IN-MEMORY)
     --------------------------------------------------------- */
     function renderUserTable() {
       const tbody = document.getElementById('userTableBody');
@@ -884,7 +861,6 @@
         isAdmin: isAdmin
       };
 
-      saveUsersToStorage();
       renderUserTable();
 
       if (currentUser && currentUser.name.toLowerCase() === key) {
@@ -898,7 +874,6 @@
     function deleteUser(userKey) {
       if (confirm(`Are you sure you want to delete "${usersDb[userKey]?.name || userKey}"?`)) {
         delete usersDb[userKey];
-        saveUsersToStorage();
         renderUserTable();
       }
     }
